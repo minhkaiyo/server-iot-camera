@@ -1,0 +1,20 @@
+# IoT Camera System - Web Server Dependencies
+# Cài đặt: pip install -r requirements.txt
+
+# Web Framework
+Flask==3.0.0
+
+# WebSocket real-time cho Dashboard
+Flask-SocketIO==5.6.1
+
+# MQTT Client kết nối Mosquitto Broker
+paho-mqtt==2.1.0
+
+# Cross-Origin Resource Sharing
+Flask-CORS==6.0.2
+
+# Async server (hỗ trợ WebSocket)
+eventlet==0.40.4
+
+# Xử lý ảnh (tạo thumbnail, decode)
+Pillow==11.1.0

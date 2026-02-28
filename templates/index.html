@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - IoT Camera System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Socket.IO Client Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        /* ========================= DESIGN SYSTEM ========================= */
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d27;
+            --bg-card: #222536;
+            --bg-card-hover: #2a2e42;
+            --accent: #4f8cff;
+            --accent-glow: rgba(79, 140, 255, 0.25);
+            --green: #34d399;
+            --green-glow: rgba(52, 211, 153, 0.25);
+            --red: #f87171;
+            --red-glow: rgba(248, 113, 113, 0.25);
+            --yellow: #fbbf24;
+            --yellow-glow: rgba(251, 191, 36, 0.25);
+            --text-primary: #e8eaed;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --border: #2d3148;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ========================= HEADER ========================= */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-left h1 {
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .connection-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .connection-badge.connected {
+            background: var(--green-glow);
+            color: var(--green);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .connection-badge.disconnected {
+            background: var(--red-glow);
+            color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .connected .connection-dot {
+            background: var(--green);
+        }
+
+        .disconnected .connection-dot {
+            background: var(--red);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* ========================= LAYOUT ========================= */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================= SIDEBAR ========================= */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .panel:hover {
+            border-color: var(--accent);
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .panel-body {
+            padding: 16px 20px;
+        }
+
+        /* ========================= DEVICE STATUS ========================= */
+        .device-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            background: var(--bg-primary);
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+
+        .device-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .device-card:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .device-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .device-icon.camera {
+            background: var(--accent-glow);
+        }
+
+        .device-icon.display {
+            background: var(--yellow-glow);
+        }
+
+        .device-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .device-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .device-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.online {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green-glow);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background: var(--text-muted);
+        }
+
+        .no-devices {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* ========================= CONTROL BUTTONS ========================= */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-card-hover);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .btn.primary:hover {
+            background: #3b7aef;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .btn.danger {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .btn.danger:hover {
+            background: var(--red-glow);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .btn.loading .spinner {
+            display: inline-block;
+        }
+
+        .btn.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ========================= MAIN CONTENT ========================= */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ========================= SERVER INFO BAR ========================= */
+        .info-bar {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .info-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .info-chip .value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* ========================= GALLERY GRID ========================= */
+        .gallery-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .gallery-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .gallery-count {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .image-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.3s;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .image-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+            background: var(--bg-primary);
+        }
+
+        .image-card-body {
+            padding: 12px 16px;
+        }
+
+        .image-card-body .filename {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .image-card-body .meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .image-card .delete-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .image-card .delete-btn:hover {
+            color: var(--red);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* ========================= LOG PANEL ========================= */
+        .log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        .log-entry {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            gap: 8px;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .log-level {
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .log-level.INFO {
+            background: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        .log-level.WARNING {
+            background: var(--yellow-glow);
+            color: var(--yellow);
+        }
+
+        .log-level.ERROR {
+            background: var(--red-glow);
+            color: var(--red);
+        }
+
+        .log-msg {
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        /* ========================= SIM CONTROL ========================= */
+        .sim-control-panel {
+            margin-bottom: 16px;
+        }
+
+        .sim-control-panel h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .sim-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--surface-light);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .sim-row .sim-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sim-row .sim-label small {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .sim-toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: #374151;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .sim-toggle.active {
+            background: var(--success);
+        }
+
+        .sim-toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            transition: transform 0.3s;
+        }
+
+        .sim-toggle.active::after {
+            transform: translateX(22px);
+        }
+
+        /* ========================= TOAST ========================= */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: white;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+            box-shadow: var(--shadow);
+        }
+
+        .toast.success {
+            background: #059669;
+        }
+
+        .toast.error {
+            background: #dc2626;
+        }
+
+        .toast.info {
+            background: #2563eb;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* ========================= WEBCAM SIMULATOR ========================= */
+        .simulator-panel {
+            background: var(--bg-card);
+            border: 2px dashed var(--accent);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .simulator-panel h3 {
+            color: var(--accent);
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .simulator-panel p {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .simulator-panel video {
+            background: #000;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: block;
+            margin: 0 auto 12px;
+        }
+
+        .sim-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ========================= HEADER ========================= -->
+    <header class="header">
+        <div class="header-left">
+            <h1>IoT Camera System</h1>
+            <span class="connection-badge disconnected" id="ws-badge">
+                <span class="connection-dot"></span>
+                <span id="ws-status-text">Connecting...</span>
+            </span>
+        </div>
+        <div>
+            <span style="font-size: 12px; color: var(--text-muted);" id="server-uptime">Server: --</span>
+        </div>
+    </header>
+
+    <!-- ========================= MAIN LAYOUT ========================= -->
+    <div class="container">
+
+        <!-- ========================= SIDEBAR ========================= -->
+        <aside class="sidebar">
+
+            <!-- Device Status Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Thiet Bi</h3>
+                    <span style="font-size: 12px; color: var(--text-muted);" id="device-count">0 devices</span>
+                </div>
+                <div class="panel-body" id="device-list">
+                    <div class="no-devices">Chua co thiet bi nao ket noi...</div>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Dieu Khien Camera</h3>
+                </div>
+                <div class="panel-body controls">
+                    <button class="btn primary" id="btn-capture" onclick="sendCommand('CAPTURE')">
+                        <span class="spinner"></span>
+                        <span class="btn-text">Chup Anh Ngay</span>
+                    </button>
+                    <button class="btn" id="btn-stream" onclick="toggleStream()">
+                        <span class="btn-text">Bat Stream (5s/anh)</span>
+                    </button>
+                    <button class="btn danger" onclick="sendCommand('RESTART')">
+                        <span class="btn-text">Khoi Dong Lai Node</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Log Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Event Log</h3>
+                    <button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="clearLogs()">Clear</button>
+                </div>
+                <div class="panel-body">
+                    <div class="log-container" id="log-container">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-level INFO">INFO</span>
+                            <span class="log-msg">Waiting for connection...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulator Controls -->
+            <div class="panel sim-control-panel">
+                <h3>Dieu Khien Simulator</h3>
+                <div class="sim-row">
+                    <div class="sim-label">Camera Node<small>sim_camera.py</small></div>
+                    <div class="sim-toggle" id="sim-toggle-camera" onclick="toggleSimulator('camera')"></div>
+                </div>
+                <div class="sim-row">
+                    <div class="sim-label">Display Node<small>sim_display.py</small></div>
+                    <div class="sim-toggle" id="sim-toggle-display" onclick="toggleSimulator('display')"></div>
+                </div>
+            </div>
+
+            <!-- Webcam Simulator -->
+            <div class="simulator-panel">
+                <h3>Webcam Simulator</h3>
+                <p>Gia lap Camera Node bang webcam PC</p>
+                <video id="webcam" width="280" height="210" autoplay playsinline muted></video>
+                <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+                <div class="sim-buttons">
+                    <button class="btn" onclick="startWebcam()" style="font-size: 12px;">Mo Webcam</button>
+                    <button class="btn primary" onclick="captureAndUploadWeb()" style="font-size: 12px;">Chup &
+                        Upload</button>
+                </div>
+                <p id="upload-status" style="margin-top: 10px; font-weight: 500; display: none;"></p>
+            </div>
+        </aside>
+
+        <!-- ========================= MAIN CONTENT ========================= -->
+        <main class="main-content">
+
+            <!-- Server Info Bar -->
+            <div class="info-bar">
+                <div class="info-chip">
+                    Tong anh: <span class="value" id="total-images">0</span>
+                </div>
+                <div class="info-chip">
+                    Dung luong: <span class="value" id="storage-used">0 MB</span>
+                </div>
+                <div class="info-chip">
+                    Server version: <span class="value" id="server-version">--</span>
+                </div>
+            </div>
+
+            <!-- Gallery -->
+            <div class="gallery-header">
+                <h2>Thu Vien Anh</h2>
+                <span class="gallery-count" id="gallery-count"></span>
+            </div>
+
+            <div class="gallery-grid" id="gallery">
+                {% for image in images %}
+                <div class="image-card" id="img-{{ image.id }}">
+                    <img src="/uploads/{{ image.filename }}" alt="{{ image.filename }}"
+                        onerror="this.src='data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;240&quot; height=&quot;180&quot; fill=&quot;%23333&quot;><rect width=&quot;240&quot; height=&quot;180&quot; fill=&quot;%231a1d27&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot; fill=&quot;%236b7280&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
+                    <div class="image-card-body">
+                        <div class="filename">{{ image.filename }}</div>
+                        <div class="meta">
+                            <span>{{ image.timestamp }}</span>
+                            <span>{{ image.device_id }}</span>
+                            <button class="delete-btn" data-image-id="{{ image.id }}" title="Xoa">&#x2715;</button>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state" id="empty-state">
+                    <div class="icon">&#128247;</div>
+                    <p>Chua co anh nao. Hay chup tu Camera Node hoac Webcam Simulator!</p>
+                </div>
+                {% endfor %}
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- ========================= JAVASCRIPT ========================= -->
+    <script>
+        /* =============================================================
+           CAU HINH SERVER
+           ============================================================= */
+        // URL cua Flask server - luon tro den port 5000
+        const SERVER_URL = 'http://' + (location.hostname || '127.0.0.1') + ':5000';
+
+        // Kiem tra neu mo sai cach (qua Live Server hoac truc tiep)
+        if (location.port && location.port !== '5000') {
+            document.body.insertAdjacentHTML('afterbegin',
+                '<div style="background:#dc2626;color:white;padding:12px 20px;text-align:center;font-size:14px;font-weight:500;">' +
+                '&#9888; Ban dang mo file nay qua port ' + location.port + '. Hay truy cap <a href="http://127.0.0.1:5000" style="color:#fbbf24;font-weight:700;">http://127.0.0.1:5000</a> de su dung dung cach!' +
+                '</div>'
+            );
+        }
+
+        /* =============================================================
+           WebSocket Connection (Flask-SocketIO)
+           ============================================================= */
+        const socket = io(SERVER_URL);
+        let isStreaming = false;
+
+        // --- Ket noi thanh cong ---
+        socket.on('connect', () => {
+            console.log('[WS] Connected!');
+            updateConnectionBadge(true);
+            addLog('INFO', 'WebSocket da ket noi thanh cong');
+            // Yeu cau trang thai he thong
+            socket.emit('request_status');
+        });
+
+        // --- Mat ket noi ---
+        socket.on('disconnect', () => {
+            console.log('[WS] Disconnected!');
+            updateConnectionBadge(false);
+            addLog('WARNING', 'Mat ket noi WebSocket');
+        });
+
+        // --- Nhan trang thai he thong ---
+        socket.on('system_status', (data) => {
+            console.log('[WS] System status:', data);
+            if (data.devices) {
+                updateDeviceList(data.devices);
+            }
+            if (data.server_uptime !== undefined) {
+                document.getElementById('server-uptime').textContent =
+                    'Server: ' + formatUptime(data.server_uptime);
+            }
+        });
+
+        // --- Anh moi duoc upload ---
+        socket.on('new_image', (data) => {
+            console.log('[WS] New image:', data);
+            showToast('Anh moi: ' + data.filename, 'success');
+            addLog('INFO', 'Anh moi tu ' + (data.device_id || 'unknown') + ': ' + data.filename);
+            addImageToGallery(data);
+            updateServerInfo();
+        });
+
+        // --- Cap nhat trang thai thiet bi ---
+        socket.on('device_update', (data) => {
+            console.log('[WS] Device update:', data);
+            updateSingleDevice(data);
+
+            if (data.status === 'offline') {
+                showToast(data.device_id + ' da Offline!', 'error');
+                addLog('WARNING', data.device_id + ' mat ket noi');
+            }
+        });
+
+        // --- Ket qua lenh da gui ---
+        socket.on('command_sent', (data) => {
+            console.log('[WS] Command sent:', data);
+            addLog('INFO', 'Lenh ' + data.command + ' da gui (ID: ' + data.cmd_id + ')');
+        });
+
+        // --- Ket qua lenh tu Camera ACK ---
+        socket.on('command_result', (data) => {
+            console.log('[WS] Command result:', data);
+            const btnCapture = document.getElementById('btn-capture');
+            btnCapture.classList.remove('loading');
+            btnCapture.disabled = false;
+
+            if (data.status === 'OK') {
+                showToast('Camera da nhan lenh: ' + (data.message || 'OK'), 'success');
+                addLog('INFO', 'ACK: ' + data.cmd_id + ' -> ' + data.status);
+            } else {
+                showToast('Loi: ' + (data.message || 'Unknown'), 'error');
+                addLog('ERROR', 'ACK Failed: ' + data.cmd_id + ' -> ' + data.message);
+            }
+        });
+
+        // --- Anh bi xoa ---
+        socket.on('image_deleted', (data) => {
+            const card = document.getElementById('img-' + data.id);
+            if (card) {
+                card.style.animation = 'fadeOut 0.3s ease forwards';
+                setTimeout(() => card.remove(), 300);
+            }
+        });
+
+        // --- Nhan log tu thiet bi ---
+        socket.on('log_entry', (data) => {
+            addLog(data.level, '[' + data.device_id + '] ' + data.event + ': ' + data.message);
+        });
+
+
+        /* =============================================================
+           Command Functions
+           ============================================================= */
+
+        function sendCommand(command, params = {}) {
+            console.log('[CMD] Sending:', command);
+
+            if (command === 'CAPTURE') {
+                const btn = document.getElementById('btn-capture');
+                btn.classList.add('loading');
+                btn.disabled = true;
+                // Auto-reset after 10s if no ACK
+                setTimeout(() => {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }, 10000);
+            }
+
+            socket.emit('send_command', {
+                target: 'camera',
+                command: command,
+                params: params
+            });
+
+            showToast('Dang gui lenh: ' + command + '...', 'info');
+        }
+
+        function toggleStream() {
+            const btn = document.getElementById('btn-stream');
+            isStreaming = !isStreaming;
+
+            if (isStreaming) {
+                sendCommand('STREAM_ON', { interval_ms: 5000 });
+                btn.textContent = 'Tat Stream';
+                btn.classList.add('danger');
+            } else {
+                sendCommand('STREAM_OFF');
+                btn.textContent = 'Bat Stream (5s/anh)';
+                btn.classList.remove('danger');
+            }
+        }
+
+        function deleteImage(imageId) {
+            if (!confirm('Ban co chac muon xoa anh nay?')) return;
+
+            fetch(SERVER_URL + '/api/images/' + imageId, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast('Da xoa anh', 'success');
+                    }
+                })
+                .catch(err => showToast('Loi xoa anh', 'error'));
+        }
+
+
+        /* =============================================================
+           UI Update Functions
+           ============================================================= */
+
+        function updateConnectionBadge(connected) {
+            const badge = document.getElementById('ws-badge');
+            const text = document.getElementById('ws-status-text');
+            badge.className = 'connection-badge ' + (connected ? 'connected' : 'disconnected');
+            text.textContent = connected ? 'Real-time' : 'Disconnected';
+        }
+
+        function updateDeviceList(devices) {
+            const container = document.getElementById('device-list');
+            const keys = Object.keys(devices);
+
+            document.getElementById('device-count').textContent = keys.length + ' devices';
+
+            if (keys.length === 0) {
+                container.innerHTML = '<div class="no-devices">Chua co thiet bi nao ket noi...</div>';
+                return;
+            }
+
+            container.innerHTML = keys.map(id => {
+                const d = devices[id];
+                const isOnline = d.status === 'online';
+                const type = d.device_type || 'unknown';
+                const icon = type === 'camera' ? '&#128247;' : '&#128250;';
+                const iconClass = type === 'camera' ? 'camera' : 'display';
+
+                return `
+                    <div class="device-card">
+                        <div class="device-icon ${iconClass}">${icon}</div>
+                        <div class="device-info">
+                            <div class="device-name">${id}</div>
+                            <div class="device-meta">
+                                ${d.ip_address || '--'} | RSSI: ${d.wifi_rssi || '--'} dBm
+                            </div>
+                        </div>
+                        <div class="status-dot ${isOnline ? 'online' : 'offline'}"></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateSingleDevice(data) {
+            // Request full status update to keep everything in sync
+            socket.emit('request_status');
+        }
+
+        function addImageToGallery(data) {
+            const gallery = document.getElementById('gallery');
+            const empty = document.getElementById('empty-state');
+            if (empty) empty.remove();
+
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.id = 'img-' + data.id;
+            card.innerHTML = `
+                <img src="${data.url}" alt="${data.filename}"
+                     onerror="this.src='data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;240&quot; height=&quot;180&quot; fill=&quot;%23333&quot;><rect width=&quot;240&quot; height=&quot;180&quot; fill=&quot;%231a1d27&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot; fill=&quot;%236b7280&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
+                <div class="image-card-body">
+                    <div class="filename">${data.filename}</div>
+                    <div class="meta">
+                        <span>${data.timestamp || 'just now'}</span>
+                        <span>${data.device_id || '--'}</span>
+                        <button class="delete-btn" onclick="deleteImage(${data.id})" title="Xoa">&#x2715;</button>
+                    </div>
+                </div>
+            `;
+
+            gallery.insertBefore(card, gallery.firstChild);
+        }
+
+        function updateServerInfo() {
+            fetch(SERVER_URL + '/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const s = data.data.server;
+                        document.getElementById('total-images').textContent = s.total_images;
+                        document.getElementById('storage-used').textContent = s.storage_used_mb + ' MB';
+                        document.getElementById('server-version').textContent = 'v' + s.version;
+                        document.getElementById('server-uptime').textContent =
+                            'Server: ' + formatUptime(s.uptime_seconds);
+                    }
+                })
+                .catch(() => { });
+        }
+
+
+        /* =============================================================
+           Log & Toast Functions
+           ============================================================= */
+
+        function addLog(level, message) {
+            const container = document.getElementById('log-container');
+            const now = new Date().toLocaleTimeString('vi-VN');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">${now}</span>
+                <span class="log-level ${level}">${level}</span>
+                <span class="log-msg">${message}</span>
+            `;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+
+            // Giu toi da 100 dong log
+            while (container.children.length > 100) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '';
+            addLog('INFO', 'Log da duoc xoa');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+
+        /* =============================================================
+           Simulator Management
+           ============================================================= */
+
+        function toggleSimulator(simType) {
+            const toggle = document.getElementById('sim-toggle-' + simType);
+            const isActive = toggle.classList.contains('active');
+
+            const endpoint = isActive ? '/api/sim/stop' : '/api/sim/start';
+            toggle.style.opacity = '0.5';
+            toggle.style.pointerEvents = 'none';
+
+            fetch(SERVER_URL + endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: simType })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        toggle.classList.toggle('active');
+                        const action = isActive ? 'TAT' : 'BAT';
+                        showToast(action + ' ' + simType + ' simulator', 'success');
+                        addLog('INFO', action + ' ' + simType + ' simulator');
+                    } else {
+                        showToast(data.message, 'error');
+                    }
+                    toggle.style.opacity = '1';
+                    toggle.style.pointerEvents = 'auto';
+                })
+                .catch(() => {
+                    showToast('Loi ket noi server', 'error');
+                    toggle.style.opacity = '1';
+                    toggle.style.pointerEvents = 'auto';
+                });
+        }
+
+        function updateSimStatus() {
+            fetch(SERVER_URL + '/api/sim/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        for (const [simType, info] of Object.entries(data.data)) {
+                            const toggle = document.getElementById('sim-toggle-' + simType);
+                            if (toggle) {
+                                if (info.running) { toggle.classList.add('active'); }
+                                else { toggle.classList.remove('active'); }
+                            }
+                        }
+                    }
+                })
+                .catch(() => { });
+        }
+
+        // Load sim status on page load
+        updateSimStatus();
+        // Refresh sim status every 10s
+        setInterval(updateSimStatus, 10000);
+
+
+        /* =============================================================
+           Webcam Simulator (giu lai tu phien ban cu)
+           ============================================================= */
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const statusText = document.getElementById('upload-status');
+        let webcamStream = null;
+
+        async function startWebcam() {
+            try {
+                if (webcamStream) {
+                    webcamStream.getTracks().forEach(track => track.stop());
+                }
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240, facingMode: "user" },
+                    audio: false
+                });
+                video.srcObject = webcamStream;
+                video.play();
+                showToast('Webcam da bat', 'success');
+            } catch (err) {
+                showToast('Khong the mo Webcam', 'error');
+                console.error(err);
+            }
+        }
+
+        function captureAndUploadWeb() {
+            if (!webcamStream) {
+                showToast('Hay bat Webcam truoc!', 'error');
+                return;
+            }
+
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(function (blob) {
+                const formData = new FormData();
+                formData.append("image", blob, "web_capture.jpg");
+                formData.append("device_id", "WEB_SIMULATOR");
+                formData.append("resolution", "320x240");
+
+                fetch(SERVER_URL + "/api/upload", { method: "POST", body: formData })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            showToast('Upload thanh cong! ' + data.data.filename, 'success');
+                        }
+                    })
+                    .catch(error => {
+                        showToast('Upload that bai!', 'error');
+                    });
+            }, 'image/jpeg', 0.9);
+        }
+
+
+        /* =============================================================
+           Utility Functions
+           ============================================================= */
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (h > 0) return h + 'h ' + m + 'm';
+            if (m > 0) return m + 'm ' + s + 's';
+            return s + 's';
+        }
+
+        // Event delegation cho nut xoa anh (tranh inline onclick voi Jinja2)
+        document.addEventListener('click', function (e) {
+            if (e.target.classList.contains('delete-btn')) {
+                const imageId = e.target.getAttribute('data-image-id');
+                if (imageId) deleteImage(parseInt(imageId));
+            }
+        });
+
+        // Load server info on page load
+        updateServerInfo();
+        // Refresh server info every 30s
+        setInterval(updateServerInfo, 30000);
+    </script>
+
+</body>
+
+</html>
