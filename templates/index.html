@@ -826,11 +826,15 @@
         /* =============================================================
            CAU HINH SERVER
            ============================================================= */
-        // URL cua Flask server - luon tro den port 5000
-        const SERVER_URL = 'http://' + (location.hostname || '127.0.0.1') + ':5000';
+        // URL cua Flask server - tu dong nhan dien moi truong
+        // Tren Render: dung HTTPS + khong can port (Render tu proxy)
+        // Tren may local: dung HTTP + port 5000
+        const SERVER_URL = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+            ? 'http://' + location.hostname + ':5000'
+            : window.location.origin;
 
-        // Kiem tra neu mo sai cach (qua Live Server hoac truc tiep)
-        if (location.port && location.port !== '5000') {
+        // Kiem tra neu mo sai cach (qua Live Server hoac truc tiep) - chi canh bao tren may local
+        if ((location.hostname === '127.0.0.1' || location.hostname === 'localhost') && location.port && location.port !== '5000') {
             document.body.insertAdjacentHTML('afterbegin',
                 '<div style="background:#dc2626;color:white;padding:12px 20px;text-align:center;font-size:14px;font-weight:500;">' +
                 '&#9888; Ban dang mo file nay qua port ' + location.port + '. Hay truy cap <a href="http://127.0.0.1:5000" style="color:#fbbf24;font-weight:700;">http://127.0.0.1:5000</a> de su dung dung cach!' +
