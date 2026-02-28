@@ -45,9 +45,12 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Cấu hình MQTT Broker
-MQTT_BROKER_HOST = '127.0.0.1'  # Mosquitto chạy trên cùng máy
-MQTT_BROKER_PORT = 1883
-MQTT_CLIENT_ID = 'iot_web_server'
+# Cấu hình MQTT Broker (Đọc từ biến môi trường hoặc dùng giá trị mặc định)
+MQTT_BROKER_HOST = os.environ.get('MQTT_BROKER_HOST', '127.0.0.1')
+MQTT_BROKER_PORT = int(os.environ.get('MQTT_BROKER_PORT', 1883))
+MQTT_USERNAME = os.environ.get('MQTT_USERNAME', None)
+MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD', None)
+MQTT_CLIENT_ID = os.environ.get('MQTT_CLIENT_ID', 'iot_web_server')
 
 # Cấu hình Heartbeat
 HEARTBEAT_TIMEOUT = 90  # Giây — nếu thiết bị không gửi heartbeat trong 90s → offline
@@ -353,16 +356,21 @@ def setup_mqtt():
     mqtt_client.on_connect = on_mqtt_connect
     mqtt_client.on_message = on_mqtt_message
 
+    # Cấu hình bảo mật nếu có username/password (dùng cho Cloud Broker)
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    
+    # Nếu dùng cổng 8883 (TLS/SSL - HiveMQ quy định)
+    if MQTT_BROKER_PORT == 8883:
+        mqtt_client.tls_set()
+
+    print(f"[MQTT] Đang kết nối đến {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}...")
     try:
         mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, keepalive=60)
         # Chạy MQTT loop trong thread riêng (không block Flask)
         mqtt_client.loop_start()
-        print(f"[MQTT] Đang kết nối đến {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}...")
-    except ConnectionRefusedError:
-        print("[MQTT] ⚠️ Không thể kết nối đến Mosquitto Broker!")
-        print("       Hãy đảm bảo Mosquitto đang chạy: net start mosquitto")
     except Exception as e:
-        print(f"[MQTT] ⚠️ Lỗi kết nối: {e}")
+        print(f"[MQTT] ❌ Lỗi kết nối: {e}")
 
 
 # ========================= HEARTBEAT MONITOR =========================
